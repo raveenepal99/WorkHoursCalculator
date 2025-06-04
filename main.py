@@ -1,14 +1,26 @@
 import os
-import pdfplumber
+try:
+    import pdfplumber
+except ImportError as e:
+    raise SystemExit(
+        "The pdfplumber package is required to run this script."
+        " Please install it using 'pip install pdfplumber'."
+    )
 import re
 import pandas as pd
 
 def extract_text_from_pdf(pdf_path):
-    with pdfplumber.open(pdf_path) as pdf:
-        text = ""
-        for page in pdf.pages:
-            text += page.extract_text()
-    return text
+    """Extract text from a PDF file."""
+    try:
+        with pdfplumber.open(pdf_path) as pdf:
+            text = ""
+            for page in pdf.pages:
+                page_text = page.extract_text() or ""
+                text += page_text
+        return text
+    except Exception as exc:
+        print(f"Failed to read {pdf_path}: {exc}")
+        return ""
 
 def extract_work_details(text):
     # Multiple patterns for dates and work hours to match various formats
@@ -50,16 +62,21 @@ def extract_work_details(text):
     }
 
 def process_payslips(payslip_folder):
+    """Process all PDF payslips in a folder."""
+    if not os.path.isdir(payslip_folder):
+        print(f"Payslip folder '{payslip_folder}' does not exist.")
+        return
+
     data = []
-    
+
     # Iterate over all PDF files in the Payslips folder
     for filename in os.listdir(payslip_folder):
-        if filename.endswith('.pdf'):
+        if filename.lower().endswith('.pdf'):
             pdf_path = os.path.join(payslip_folder, filename)
-            print(f"Processing file: {filename}")  # Debug: Verify file processing
+            print(f"Processing file: {filename}")
             text = extract_text_from_pdf(pdf_path)
             details = extract_work_details(text)
-            details["Filename"] = filename  # Add filename for reference
+            details["Filename"] = filename
             data.append(details)
     
     # Check if data was collected
@@ -72,8 +89,10 @@ def process_payslips(payslip_folder):
     df.to_csv("output.csv", index=False)
     print("Data saved to output.csv")
 
-# Define the Payslips folder path
-payslip_folder = os.path.join(os.path.dirname(__file__), 'Payslips')
+def main():
+    payslip_folder = os.path.join(os.path.dirname(__file__), 'Payslips')
+    process_payslips(payslip_folder)
 
-# Run the payslip processing
-process_payslips(payslip_folder)
+
+if __name__ == '__main__':
+    main()
